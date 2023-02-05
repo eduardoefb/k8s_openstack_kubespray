@@ -1,0 +1,33 @@
+#!/bin/bash
+
+MAX_HISTORY=10
+echo {{ docker.token }}  | docker login -u {{ docker.user }} --password-stdin 
+docker_ps=`docker ps -a | grep -v CONTAINER | wc -l`
+while [ ${docker_ps} -gt ${MAX_HISTORY} ]; do
+    docker_ps=`docker ps -a | grep -v CONTAINER | wc -l`
+    rem=$((${docker_ps}-${MAX_HISTORY}))
+    for d in `docker ps -a | grep -v CONTAINER | awk '{print $1}' | tail -${rem}`; do 
+        docker rm ${d}
+    done
+done
+
+docker run  --privileged \
+    -e VPN_SERVER_IPV4=`host {{ vpn.hostname }} | grep -oP '\d+\.\d+\.\d+\.\d+$'` \
+    -e VPN_PSK='{{ vpn.psk }}' \
+    -e VPN_USERNAME='{{ vpn.username }}' \
+    -e VPN_PASSWORD='{{ vpn.password }}' \
+    -e ROUTES='{{ vpn.routes|join(",") }}' \
+    -e ENODEB_IPS='{{ enodeb.ips|join(",") }}' \
+    -e ENODEB_SSH_USER='{{ enodeb.ssh.username }}' \
+    -e ENODEB_SSH_PASS='{{ enodeb.ssh.password }}' \
+    -e ENODEB_GUI_USER='{{ enodeb.webgui.username }}' \
+    -e ENODEB_GUI_PASS='{{ enodeb.webgui.password }}' \
+    -e MAX_GUI_SIM_CONNECTIONS='{{ enodeb.webgui.max_sim_connections }}' \
+    -e MAX_SSH_SIM_CONNECTIONS='{{ enodeb.ssh.max_sim_connections }}' \
+    -e DB_URL='{{ database.url }}' \
+    -e DB_NAME='{{ database.db_name }}' \
+    -e DB_USER='{{ database.username }}' \
+    -e DB_PASS='{{ database.password }}' \
+    -e DB_TABLE_NAME='{{ database.table_name }}' \
+    -t -d {{ docker.image }}
+

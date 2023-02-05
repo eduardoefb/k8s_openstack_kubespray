@@ -1,0 +1,13 @@
+images:
+ - file: *.tar.gz
+   dire: /home/eduardoefb/scripts/ansible/k8s_openstack_kubespray/ansible
+   type: tgz
+
+ - file: *.tar.gz
+   dire: /home/eduardoefb/scripts/ansible/k8s_openstack_kubespray/ansible
+   type: tgz
+
+ - file: *.tar.gz
+   dire: /home/eduardoefb/scripts/ansible/k8s_openstack_kubespray/ansible
+   type: tgz
+

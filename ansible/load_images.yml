@@ -1,0 +1,24 @@
+
+
+- hosts: REGISTRY
+  user: ubuntu    
+  tasks:
+    - include_vars: "{{ playbook_dir }}/vars.yml"
+    - include_vars: "{{ playbook_dir }}/images.yml"  
+    - name: Delete dire
+      file:
+        path: /home/ubuntu/images
+        state: absent
+
+    - name: Create dire
+      file:
+        path: /home/ubuntu/images
+        state: directory
+    
+    - name: Copy files
+      unarchive:
+        src: "{{ item.dire }}/{{ item.file }}"
+        dest: /home/ubuntu/images/
+      loop: 
+        "{{ images }}"
+      

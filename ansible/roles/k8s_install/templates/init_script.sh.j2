@@ -1,0 +1,13 @@
+#!/bin/bash 
+chown -R ubuntu:ubuntu /home/ubuntu/kubespray
+
+# Update Ansible inventory file with inventory builder
+cd /home/ubuntu/kubespray
+unset IPS
+ {% for m in k8s_nodes %}
+      IPS+=({{ m }})
+ {% endfor %}
+
+ declare -a IPS
+      
+ CONFIG_FILE=inventory/mycluster/hosts.yaml python3 contrib/inventory_builder/inventory.py ${IPS[@]}

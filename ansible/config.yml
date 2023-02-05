@@ -1,0 +1,18 @@
+---
+
+  metallb_ip_range: "10.5.0.101-10.5.0.250"
+  dns_servers:
+    - 10.2.1.30
+  nfs:
+    path: "/srv/k8s/"
+    allowed_networks: 
+      - 10.5.0.0/24
+
+    storage_class:
+      namespace: "provisioner"
+      name: "nfs"
+
+    volumes: []
+
+  CALICO_IPV4POOL_CIDR: 10.96.0.0/16
+

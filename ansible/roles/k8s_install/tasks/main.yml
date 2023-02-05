@@ -1,0 +1,99 @@
+---
+  
+  - include_vars: "{{ playbook_dir }}/config.yml"
+  - include_vars: "{{ playbook_dir }}/vars.yml"  
+
+  - name: Delete dir
+    file:
+      path: /home/ubuntu/kubespray
+      state: absent
+
+  - name: Clone kubestpray
+    ansible.builtin.git:
+      repo: 'https://github.com/kubernetes-sigs/kubespray.git'
+      dest: /home/ubuntu/kubespray
+      version: master
+
+  - name: Install pip and nfs
+    apt:
+      pkg:
+        - python3-pip
+        - nfs-kernel-server
+    register: apt_res
+    retries: 300
+    delay: 10
+    until: apt_res is success  
+
+  
+  - name: Install specified python requirements
+    pip:
+      requirements: /home/ubuntu/kubespray/requirements.txt
+    register: apt_res
+    retries: 300
+    delay: 10
+    until: apt_res is success  
+
+
+  - name: Copy sample inventory file
+    shell: |
+      cd /home/ubuntu/kubespray
+      cp -rfp inventory/sample inventory/mycluster
+      cd
+      chown -R ubuntu:ubuntu /home/ubuntu/kubespray 
+
+  - name: Configure init script
+    template:
+      src: init_script.sh.j2
+      dest: /home/ubuntu/init_script.sh    
+
+  - name: Exec init script
+    shell: |
+      su - ubuntu -c 'bash /home/ubuntu/init_script.sh'
+
+  - name: Templates all.yaml.j2
+    template:
+      src: all.yaml.j2
+      dest: /home/ubuntu/kubespray/inventory/mycluster/group_vars/all/all.yml
+      mode: "0644"
+      owner: ubuntu
+      group: ubuntu  
+
+  - name: Templates hosts.yaml.j2 
+    template:
+      src: hosts.yaml.j2
+      dest: /home/ubuntu/kubespray/inventory/mycluster/hosts.yaml
+      mode: "0644"
+      owner: ubuntu
+      group: ubuntu    
+
+  - name: Change values
+    shell: |    
+      sed -i 's/container_manager: docker/container_manager: containerd/g' /home/ubuntu/kubespray/inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml
+      sed -i 's/etcd_deployment_type: docker/etcd_deployment_type: host/g' /home/ubuntu/kubespray/inventory/mycluster/group_vars/etcd.yml
+      chown -R ubuntu:ubuntu /home/ubuntu/kubespray
+
+  - name: Delete rsa key
+    file:
+      path: /home/ubuntu/.ssh/id_rsa
+      state: absent
+
+  - name: Delete rsa key
+    file:
+      path: /home/ubuntu/.ssh/id_rsa.pub
+      state: absent
+  
+  - name: Create rsa
+    shell: |
+      ssh-keygen  -t rsa  -q -N "" -f /home/ubuntu/.ssh/id_rsa
+      chown -R ubuntu:ubuntu /home/ubuntu/.ssh/
+
+  - name: Get public key
+    fetch:
+      src: /home/ubuntu/.ssh/id_rsa.pub
+      dest: /tmp/id_rsa.pub
+      flat: yes
+
+
+      
+
+      

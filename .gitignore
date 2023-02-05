@@ -1,0 +1,8 @@
+geckodriver.log
+scripts/configrc
+terraform/geckodriver.log
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+openstackrc
+150.Dynamic.EFS.md
+openstack_gui.py

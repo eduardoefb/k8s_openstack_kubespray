@@ -1,0 +1,25 @@
+c: C=BR
+domain: kubespray.int
+nodes:
+  - master01.kubespray.int
+  - worker01.kubespray.int
+  - worker02.kubespray.int
+  - nfs01.kubespray.int
+  - reg01.kubespray.int
+k8s_nodes:
+  - 10.5.0.20
+  - 10.5.0.30
+  - 10.5.0.31
+k8s_master:
+  - name: master01
+    ip: 10.5.0.20
+k8s_worker:
+  - name: worker01
+    ip: 10.5.0.30
+  - name: worker02
+    ip: 10.5.0.31
+master01: 10.5.0.20
+worker01: 10.5.0.30
+worker02: 10.5.0.31
+nfs01: 10.5.0.40
+reg01: 10.5.0.42

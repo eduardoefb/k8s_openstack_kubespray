@@ -1,0 +1,8 @@
+alias master01="ssh -o StrictHostKeyChecking=no debian@10.10.8.104"
+alias nfs01="ssh -o StrictHostKeyChecking=no debian@10.10.8.54"
+alias worker01="ssh -o StrictHostKeyChecking=no debian@10.10.8.94"
+alias worker02="ssh -o StrictHostKeyChecking=no debian@10.10.8.111"
+alias master01="ssh -o StrictHostKeyChecking=no debian@10.10.8.104"
+alias nfs01="ssh -o StrictHostKeyChecking=no debian@10.10.8.54"
+alias worker01="ssh -o StrictHostKeyChecking=no debian@10.10.8.94"
+alias worker02="ssh -o StrictHostKeyChecking=no debian@10.10.8.111"

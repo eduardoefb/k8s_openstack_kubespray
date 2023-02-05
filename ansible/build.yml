@@ -1,0 +1,113 @@
+
+- hosts: localhost
+  tasks:
+    - include_vars: "{{ playbook_dir }}/vars.yml"
+    - name: Wait for connection
+      wait_for:
+        host: "{{ item }}"
+        port: 22
+        timeout: 300
+      loop:
+        "{{ nodes }}"
+
+- hosts: NFS
+  user: debian
+  become: true
+  roles:
+    - role: update
+    - role: nfs_server
+  
+- hosts: MASTER, WORKER
+  user: ubuntu
+  become: true
+  roles:
+    - role: update
+
+- hosts: MASTER
+  user: ubuntu
+  run_once: true
+  become: true
+  roles:
+    - role: k8s_install
+    
+
+- hosts: MASTER,WORKER
+  user: ubuntu
+  tasks: 
+    - name: Copy public key
+      copy:
+        src: /tmp/id_rsa.pub
+        dest: /tmp/id_rsa.pub
+      
+    - name: Authorize key
+      shell: cat /tmp/id_rsa.pub >> /home/ubuntu/.ssh/authorized_keys
+
+- hosts: MASTER
+  user: ubuntu
+  tasks:
+    - name: Deploy 
+      shell: |
+        cd /home/ubuntu/kubespray
+        ansible-playbook -i inventory/mycluster/hosts.yaml  --become --become-user=root cluster.yml > /tmp/kubespray.log
+      register: apt_res
+      retries: 300
+      delay: 10
+      until: apt_res is success          
+
+- hosts: MASTER,WORKER
+  user: ubuntu
+  become: true
+  tasks: 
+     - name: Install pip
+       apt:
+         pkg:
+           - nfs-kernel-server
+
+- hosts: MASTER
+  user: ubuntu
+  run_once: true
+  become: true
+  roles:
+    - role: k8s_config        
+                 
+- hosts: MASTER
+  user: ubuntu
+  become: true
+  tasks: 
+    - name: Get kubeconfig
+      fetch: 
+        src: /root/.kube/config
+        dest: /home/eduardoefb/.kube/config
+        flat: yes
+
+- hosts: localhost
+  tasks: 
+    - include_vars: "{{ playbook_dir }}/vars.yml"  
+    - name: Kubeconfig
+      shell: |
+        sed -i 's/lb-apiserver.kubernetes.local/{{ master01 }}/g' /home/eduardoefb/.kube/config
+
+  
+- hosts: REGISTRY
+  user: ubuntu
+  become: true
+  tasks: 
+    - include_vars: "{{ playbook_dir }}/vars.yml"  
+    - name: Delete directory
+      file: 
+        path: /home/ubuntu/.kube
+        state: absent
+
+    - name: Create directory
+      file: 
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0700'
+
+    - name: Transfer file
+      copy:
+        src: /home/eduardoefb/.kube/config
+        dest: /home/ubuntu/.kube/config
+

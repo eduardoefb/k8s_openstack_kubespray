@@ -1,0 +1,265 @@
+  # tasks file for amf
+  - include_vars: "{{ playbook_dir }}/vars.yml" 
+  
+  - name: Update 
+    apt:
+      name: '*'
+      state: 'latest'
+      update_cache: yes
+    retries: 300
+    delay: 10
+  
+  - name: Check if reboot required
+    stat:
+      path: /var/run/reboot-required
+    register: reboot_required_file    
+
+  - name: Reboot
+    reboot:
+      msg: Reboot
+      reboot_timeout: 360
+    when: reboot_required_file.stat.exists == true
+        
+  - name: Install packages
+    apt:
+        pkg: 
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: latest
+  
+  - name: Create certificate directory
+    file:
+      path: /root/certs
+      state: absent
+
+  - name: Create certificate directory
+    file:
+      path: /root/certs
+      state: directory
+
+  - name: Create the certificates
+    shell: |
+      c="C=BR"
+      
+      cd /root/certs
+      openssl genrsa -out regca.key 2048
+      openssl req -x509 -new -nodes -key regca.key -sha256 -days 3650 -out regca.crt -subj "/${c}/CN=regca.{{ domain }}"
+
+      {% for n in nodes %}
+      openssl genrsa -out {{ n }}.key 2048
+      openssl req -new -key {{ n }}.key -out {{ n }}.csr -subj "/{{ c }}/CN={{ n }}"
+      openssl x509 -req -in {{ n }}.csr -CA regca.crt -CAkey regca.key -CAcreateserial -out {{ n }}.crt -days 8650 -sha256
+      {% endfor %}
+      rm regca.key
+      rm *.csr
+    args:
+        executable: /bin/bash
+  
+  - name: Add Docker official GPG key 
+    shell: |
+      if [ ! -f /usr/share/keyrings/docker-archive-keyring.gpg ]; then
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null      
+      fi    
+    args:
+  - name: Install packages
+    apt:
+        pkg: 
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: latest
+  
+  - name: Create certificate directory
+    file:
+      path: /root/certs
+      state: absent
+
+  - name: Create certificate directory
+    file:
+      path: /root/certs
+      state: directory
+
+  - name: Create the certificates
+    shell: |
+      cd /root/certs
+      openssl genrsa -out regca.key 2048
+      openssl req -x509 -new -nodes -key regca.key -sha256 -days 3650 -out regca.crt -subj "/{{ c }}/CN=regca.{{ domain }}"
+
+      {% for n in nodes %}
+      openssl genrsa -out {{ n }}.key 2048
+      
+      openssl req -new -key {{ n }}.key \
+        -out {{ n }}.csr \
+        -subj "/{{ c }}/CN={{ n }}"  \
+        -addext "subjectAltName = DNS: {{ c }}"
+      
+      openssl x509 \
+        -extfile <(printf "[SAN]\nsubjectAltName=DNS: {{ n }}") \
+        -extensions SAN -req -in {{ n }}.csr \
+        -CA regca.crt -CAkey regca.key -CAcreateserial \
+        -out {{ n }}.crt -days 8650 -sha256 
+
+      {% endfor %}
+      rm regca.key
+      rm *.csr
+    args:
+        executable: /bin/bash 
+  
+  
+  - name: Add Docker official GPG key 
+    shell: |
+      if [ ! -f /usr/share/keyrings/docker-archive-keyring.gpg ]; then
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null      
+      fi    
+    args:
+      executable: /bin/bash
+
+  - name: Update 
+    apt:
+      name: '*'
+      state: 'latest'
+      update_cache: yes
+    retries: 300
+    delay: 10
+
+  - name: Install docker engine
+    apt: 
+      pkg:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-compose-plugin
+
+  - name: Add privilegies to ubuntu user
+    user: 
+      name: ubuntu
+      groups: docker
+      append: yes      
+  
+  - name: Stop and remove any docker container
+    shell: |
+      for d in `docker ps | grep -v CONTAINER | awk '{print $1}'`; do
+         docker stop ${d}
+      done
+
+      for d in `docker ps -a | grep -v CONTAINER | awk '{print $1}'`; do
+         docker rm ${d}
+      done    
+
+    args:
+      executable: /bin/bash  
+
+  - name: Start registry
+    shell: |
+      cd /root/
+      mkdir auth
+      docker run \
+         --entrypoint htpasswd \
+         httpd:2 -Bbn testuser testpassword > auth/htpasswd  
+             
+      docker run -d \
+        --restart=always \
+        --name registry \
+        -v "$(pwd)"/auth:/auth \
+        -e "REGISTRY_AUTH=htpasswd" \
+        -e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" \
+        -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \        
+        -v /root/certs:/certs \
+        -e REGISTRY_HTTP_ADDR=0.0.0.0:443 \
+        -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/`hostname`.{{ domain }}.crt 	  \
+        -e REGISTRY_HTTP_TLS_KEY=/certs/`hostname`.{{ domain }}.key  \
+        -p 443:443 \
+        registry:2      
+      
+    args:
+      executable: /bin/bash
+      
+  - name: Create directory
+    file:
+      path: /usr/local/share/ca-certificates/extra/
+      state: directory
+  
+  - name: Delete directory
+    file:
+      path: /etc/docker/certs.d/regca
+      state: absent
+
+  - name: Create directory
+    file:
+      path: /etc/docker/certs.d/regca
+      state: directory
+
+  - name: Get ca
+    fetch:
+      src: /root/certs/regca.crt
+      dest: /tmp/
+      flat: yes
+
+  - name: Transfer files
+    copy:
+      src: "/tmp/regca.crt" 
+      dest: /usr/local/share/ca-certificates/extra/regca.crt
+
+
+  - name: Transfer files
+    copy:
+      src: "/tmp/regca.crt" 
+      dest: /etc/docker/certs.d/regca/regca.crt
+
+  - name: Update ca trusted list
+    shell: |
+      /usr/sbin/update-ca-certificates
+    args:
+      executable: /bin/bash
+
+  - name: Copy daemon.json
+    copy: 
+      src: daemon.json
+      dest: /etc/docker/daemon.json 
+
+  - name: Restart docker
+    systemd:
+      name: docker 
+      state: restarted
+
+  - name: Kubectl
+    shell: |
+      if [ ! -f "/usr/local/bin/kubectl" ]; then
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        mv kubectl /usr/local/bin/
+        chmod +x /usr/local/bin/kubectl
+      fi
+
+      
+ 
+
+
+
+
+ 
+
+
+    
+
+    
+   
+      
+
+  
+
+         
+
+
+
+
+  
+    

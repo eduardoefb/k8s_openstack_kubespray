@@ -1,0 +1,54 @@
+
+- hosts: localhost
+  tasks:
+    - include_vars: "{{ playbook_dir }}/vars.yml"
+    - name: Wait for connection
+      wait_for:
+        host: "{{ item }}"
+        port: 22
+        timeout: 300
+      loop:
+        "{{ nodes }}"
+
+- hosts: REGISTRY
+  user: ubuntu
+  run_once: true
+  become: true
+  roles:
+    - role: install_docker        
+
+- hosts: REGISTRY
+  user: ubuntu
+  run_once: true
+  become: true
+  tasks:
+    - name: Fetch certificate
+      fetch:
+        src: /root/certs/regca.crt
+        dest: /tmp/
+        flat: yes
+      
+- hosts: MASTER, WORKER
+  user: ubuntu
+  become: true 
+  tasks:
+    - name: Create the directoy for ca 
+      file:
+        path: /usr/local/share/ca-certificates/extra
+        state: directory 
+
+    - name: Copy the certificates
+      copy:
+        src: "/tmp/regca.crt" 
+        dest: /usr/local/share/ca-certificates/extra/regca.crt
+
+    - name: Update ca trusted list
+      shell: |
+        /usr/sbin/update-ca-certificates
+      args:
+        executable: /bin/bash
+        
+
+
+
+

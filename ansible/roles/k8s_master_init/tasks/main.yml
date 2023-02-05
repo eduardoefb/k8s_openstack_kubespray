@@ -1,0 +1,41 @@
+---
+# tasks file for k8s_init
+
+  - include_vars: "{{ playbook_dir }}/vars.yml"
+    
+  - name: Init k8s cluster
+    shell: kubeadm init  --control-plane-endpoint "{{ master01 }}:6443" --upload-certs > /tmp/kube_init.log
+
+  - name: Configure kubeconfig part 3
+    copy:
+      src: /etc/kubernetes/admin.conf
+      dest: /root/.kube/config
+      remote_src: yes
+      owner: root
+      group: root
+      mode: '0400'
+    
+  - name: Get kube config
+    fetch:
+      src: /root/.kube/config
+      dest: ~/.kube/config
+      mode: '0400'
+      flat: yes    
+      
+  - name: Retrive configuration for other masters
+    shell: grep -A2 --color "kubeadm join" /tmp/kube_init.log | while read l; do echo $l; done | head -1
+    register: master_join
+
+  - name: Retrive configuration for other workers
+    shell: grep -A2 --color "kubeadm join" /tmp/kube_init.log | while read l; do echo $l; done | tail -1
+    register: worker_join  
+
+  - name: Export master_join
+    add_host:
+      name: "master_join"
+      value: "{{ master_join.stdout}}"    
+
+  - name: Export worker_join
+    add_host:
+      name: "worker_join"
+      value: "{{ worker_join.stdout}}"  

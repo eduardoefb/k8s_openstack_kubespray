@@ -1,0 +1,5 @@
+---
+# tasks file for k8s_worker_join
+  - include_vars: "{{ playbook_dir }}/vars.yml"       
+  - name: Configure worker nodes
+    shell: "{{ hostvars['worker_join']['value'] }}"

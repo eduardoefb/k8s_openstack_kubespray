@@ -1,0 +1,11 @@
+---
+# handlers file for amf
+- shell: sysctl -p --system
+  become: yes
+  when: result.changed
+
+- name: Restart Containerd  
+  systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
